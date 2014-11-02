@@ -33,7 +33,9 @@ mkdir -p -m 700 $HOME/.ssh
 
 # Set Project
 if [[ -z $PROJECT ]]; then
-    export $PROJECT="project"
+    echo "null"
+fi
+    export PROJECT="project"
 fi
 wideenv PROJECT "$PROJECT"
 
