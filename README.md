@@ -1,78 +1,85 @@
-Docker Ruby Deploy [![Docker repo](http://img.shields.io/badge/docker-repo-blue.svg)](https://registry.hub.docker.com/u/gullitmiranda/docker-ruby-deploy/)
+Docker Ruby Deploy [![Docker repo](http://img.shields.io/badge/docker-repo-blue.svg)](https://registry.hub.docker.com/u/gullitmiranda/deploy/)
 ================
 
 Dockerized Git deploy through SSH service, built on top of [gullitmiranda/ruby](https://registry.hub.docker.com/u/gullitmiranda/ruby/) image. It uses git 'post-receive' hook and provides nice colored logs for each pushed commit.
-
-Accepts an `IN`, `BRANCH_*`, `USER` and `PUBLIC_KEY` settings through environment variables, if the git history doesn't matter to you, pass only the `BRANCH_*` and `PUBLIC_KEY` settings, which aren't optional
 
 This Dockerized image doesn't allow plain text logins, can only connect to it through the use of a public RSA key.
 
 NOTE: This repository is based on [pocesar/docker-git-deploy](https://github.com/pocesar/docker-git-deploy)
 
-## Defaults
+## Image Tags
 
-```
-USER = git # The user used in the git push
-PUBLIC_KEY = "" # Your mounted public key path inside the container
-IN = "" # The folder that holds the git bare repo
-BRANCH_* = "" # The folder that receives the git checkout depending on the name of the variable
-# use BRANCH_MASTER="/out" for example, or BRANCH_TESTING="/testout"
-```
+- `deploy:ruby` based on [gullitmiranda/ruby](https://registry.hub.docker.com/u/gullitmiranda/ruby/)
+  + Ruby 2.1.2p95 (2014-05-08 revision 45877) [x86_64-linux]
+  + Bundler 1.7.3
+
+All images contains:
+  - OpenSSH
+  - Git and Git bare
 
 ## Setup
 
 ```bash
 $ docker run -d \
-    -p 1234:22 \
-    --name deploy \
-    -e PUBLIC_KEY="/id_rsa.pub" \
-    -v ~/.ssh/id_rsa.pub:/id_rsa.pub \
-    -e BRANCH_TRUSTY="/out" \
-    -e BRANCH_MASTER="/out" \
-    -v /var/www:/out \
-    -e IN="/in" \
-    pocesar/docker-git-deploy
+  -p 1234:22 \
+  --name deploy-ruby \
+  -e PROJECT="project" \
+  -e PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub)" \
+  -e PROVISION_PATH="./config/after_deploy.rb" \
+  deploy:ruby
 
-c48f7b86594953012ca4731b1ec08b053ce5826d3f501ed579c660bec42d2c88
+b5b5b70c523c6313d95860fd1c52af249a910a6933bee1a5e265866acc7ee17f
 ```
-
-NOTE: You can use `-e PUBLIC_KEY="$(echo ~/.ssh/id_rsa.pub)"` as well and drop the `-v` part of the public key
 
 ## Deploy
 
 ```bash
-git remote add upstream ssh://docker@yourhost:1234/in # or /home/git/repo.git by default
-git commit -m "Behold!"
-git push upstream master
+git remote add deploy ssh://git@localhost:1234/project.git # project.git is default $GIT_DIR
+git push deploy master
 ```
 
 ## Get logs (with colors!)
 
 ```
-$ docker logs deploy
-[+] 2014-09-18T11:36:05Z: Using branches:
-         - BRANCH_TRUSTY=/out
-         - BRANCH_MASTER=/out
-
-[+] 2014-09-18T11:36:05Z: Reading public key mount
-[+] 2014-09-18T11:36:05Z: Created user docker
-[+] 2014-09-18T11:36:05Z: Using existing path
-Initialized empty shared Git repository in /in/
-[+] 2014-09-18T11:36:05Z: Deploy using this git remote url: ssh://docker@host:port/in
+$ docker logs deploy-ruby
+[+] 2014-11-02T01:11:24Z: Appending raw public key
+[+] 2014-11-02T01:11:24Z: Created user 'git'
+[+] 2014-11-02T01:11:24Z: Enable root login
+[+] 2014-11-02T01:11:24Z: Set git dir '/project.git'
+[+] 2014-11-02T01:11:24Z: Set project dir '/project'
+Initialized empty shared Git repository in /project.git/
+[+] 2014-11-02T01:11:24Z: Create git post-receive hook
+[+] 2014-11-02T01:11:24Z:  [^] created git bare repo
+[+] 2014-11-02T01:11:24Z: Deploy using this git remote url: ssh://git@host:port/project.git
 Server listening on 0.0.0.0 port 22.
 Server listening on :: port 22.
-Accepted publickey for docker from 172.17.42.1 port 35341 ssh2: RSA 79:4f:46:33:1f:39:25:6d:0d:37:e1:e0:d2:42:5c:0e
-[^] 2014-09-18T11:36:05Z: Updated sources on BRANCH_TRUSTY:/out
+Accepted publickey for git from 172.17.42.1 port 53207 ssh2: RSA e1:86:6c:66:d0:b1:0d:1d:ba:f9:ca:cf:70:53:b2:bc
+[^] 2014-11-02T01:11:24Z: Start update sources on '/project' from 'develop' branch
+[^] 2014-11-02T01:11:24Z:  [^] Updated sources on '/project"
 -------------
-trusty a4f9d05 - Paulo Cesar, 27 hours ago: README
+develop be0d5d8 - Gullit Miranda, 2 weeks ago: [azk] update Azkfile.js to suport `mounts`
 -------------
+[^] 2014-11-02T01:11:24Z: Skipping ./config/after_deploy.rb because its not a file
 Received disconnect from 172.17.42.1: 11: disconnected by user
-Accepted publickey for docker from 172.17.42.1 port 35344 ssh2: RSA 79:4f:46:33:1f:39:25:6d:0d:37:e1:e0:d2:42:5c:0e
-[^] 2014-09-18T11:36:05Z: Updated sources on BRANCH_MASTER:/out
--------------
-master a4f9d05 - Paulo Cesar, 27 hours ago: README
--------------
-Received disconnect from 172.17.42.1: 11: disconnected by user
+```
+
+## Settings
+
+```
+# Required
+  PUBLIC_KEY = '" # Your mounted public key path inside the container
+
+# Optional
+  USER              # The user used in the git push, default is 'git'
+  PERMITROOTLOGIN   # Allow login as root
+
+  ### PATHs
+  PROJECT           # Project name, also used to set the default GIT_DIR and PROJECT_DIR, default 'project'
+  GIT_DIR           # The folder that holds the git bare repo, default '/$PROJECT.git'
+  PROJECT_DIR       # The folder that receives the git checkout, default `/$PROJECT`
+
+  ### Scripts
+  PROVISION_PATH    # Path of the script to run after deploy
 ```
 
 ## Mods
@@ -81,7 +88,7 @@ You can inject your bash scripts into the `post-receive` hook by mounting your s
 
 You can also use `echo "hello world" >> $MEM_LOG` to output stuff to the docker log from any of your scripts. Be aware that the user script will be called everytime there's a push.
 
-The same goes for the setup script, in `-v /var/some/script.sh:/setup`, it will be called once the container is ran. Useful to install extra software you may need (like `ruby`, `node`, `jekyll`). Please note that those tools are ran inside the container, and you may only output or use the `BRANCH_*` environment variables to execute your commands. Eg.:
+The same goes for the setup script, in `-v /var/some/script.sh:/setup`, it will be called once the container is ran. Useful to install extra software you may need (like `ruby`, `node`, `jekyll`). Please note that those tools are ran inside the container, and you may only output or use the `$PROJECT_DIR` environment variables to execute your commands. Eg.:
 
 ```bash
 #!/bin/bash
@@ -89,7 +96,7 @@ The same goes for the setup script, in `-v /var/some/script.sh:/setup`, it will 
 # this is /setup
 
 apt-get -y -qq install nodejs
-wget http://example.com/something.js > "$BRANCH_MASTER/something.js"
+wget http://example.com/something.js > "$PROJECT_DIR/something.js"
 echo "something.js downloaded" >> $MEM_LOG # goes to docker logs
 ```
 
@@ -105,6 +112,6 @@ var
 # process.argv[2] === gitref
 
 if (process.argv[1] === 'master') {
-    fs.chmodSync(path.join(process.env.BRANCH_MASTER, 'cache'), '0774');
+    fs.chmodSync(path.join(process.env.PROJECT_DIR, 'cache'), '0774');
 }
 ```
